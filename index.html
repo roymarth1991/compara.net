@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Comparador de Precio IA</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #212529;
+      --card-color: #ffffff;
+    }
+    body.dark {
+      --bg-color: #121212;
+      --text-color: #f8f9fa;
+      --card-color: #1f1f1f;
+    }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      transition: background-color 0.3s, color 0.3s;
+      min-height: 100vh;
+    }
+    .search-card, .result-card {
+      background-color: var(--card-color);
+      color: var(--text-color);
+      transition: background-color 0.3s, color 0.3s;
+    }
+    .btn-toggle-mode {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 10000;
+    }
+    .btn-home {
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 10000;
+      border: none;
+      background: transparent;
+      font-size: 1.5rem;
+      color: var(--text-color);
+    }
+    .btn:hover {
+      transform: scale(1.05);
+      transition: transform 0.2s;
+    }
+    .rank-badge {
+      font-weight: bold;
+      margin-right: 0.5rem;
+    }
+    .rank-1 { color: gold; }
+    .rank-2 { color: silver; }
+    .rank-3 { color: #cd7f32; }
+    /* Spinner overlay */
+    #loadingOverlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(255,255,255,0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    /* Typing effect */
+    .typing {
+      border-right: .15em solid #007bff;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    /* Hero bounce animation */
+    @keyframes bounce {
+      0%,100%{ transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+    .hero-text {
+      display: inline-block;
+      animation: bounce 2s ease-in-out infinite;
+    }
+    /* Progress bar */
+    #topProgress {
+      position: fixed;
+      top: 0; left: 0;
+      width: 0%; height: 4px;
+      background: #007bff;
+      transition: width 0.4s ease;
+      z-index: 10000;
+    }
+    @media (max-width: 576px) {
+      .search-card { margin: 1rem; padding: 1rem; }
+      .hero-text { font-size: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Home & Dark/Light Mode Toggle -->
+  <button class="btn-home" onclick="window.location='/'">🏠</button>
+  <button class="btn btn-secondary btn-toggle-mode" onclick="toggleMode()">🌞/🌙</button>
+  <!-- Top Progress Bar -->
+  <div id="topProgress"></div>
+  <!-- Spinner overlay -->
+  <div id="loadingOverlay">
+    <div class="text-center">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p id="statusMessage" class="mt-2 fs-5 typing" data-text="Buscando tu mejor precio, ¡no te preocupes! 😊"></p>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Introductorio -->
+    <div class="text-center my-4">
+      <h2 class="text-primary hero-text">Encuentra el mejor precio en segundos</h2>
+      <p class="lead text-secondary">Compara ofertas de tus tiendas favoritas y descubre la opción más económica al instante.</p>
+    </div>
+    <!-- Search Card -->
+    <div class="search-card">
+      <h1 class="text-center mb-4 text-primary">Comparador de Precio IA</h1>
+      <form method="post" class="d-flex flex-column flex-md-row" id="searchForm">
+        <input list="sugerencias" type="text" name="termino" class="form-control me-md-2 mb-2 mb-md-0" placeholder="Busca un producto..." value="{{ termino }}" required />
+        <datalist id="sugerencias">
+          <option value="Leche"><option value="Arroz"><option value="Aceite"><option value="Huevos"><option value="Pan"><option value="Detergente">
+        </datalist>
+        <button type="submit" class="btn btn-primary">Buscar</button>
+      </form>
+    </div>
+
+    {% if resultados %}
+    <div class="mt-4">
+      <h2 class="mb-3 text-secondary">Resultados para «{{ termino }}»</h2>
+      <div class="row">
+        {% for r in resultados %}
+        <div class="col-md-6">
+          <div class="card result-card {% if loop.index0 == 0 %}best-option{% endif %}">
+            <div class="card-body">
+              <h5 class="card-title d-flex align-items-center">
+                {% if loop.index == 1 %}
+                  <span class="rank-badge rank-1">🥇</span>
+                {% elif loop.index == 2 %}
+                  <span class="rank-badge rank-2">🥈</span>
+                {% elif loop.index == 3 %}
+                  <span class="rank-badge rank-3">🥉</span>
+                {% else %}
+                  <span class="me-2">#{{ loop.index }}</span>
+                {% endif %}
+                {% if r.enlace %}
+                <a href="{{ r.enlace }}" target="_blank">{{ r.nombre }}</a>
+                {% else %}
+                {{ r.nombre }}
+                {% endif %}
+              </h5>
+              <p class="card-text text-success fs-5">{{ r.precio }} <small class="text-muted">({{ r.tienda }})</small></p>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Dark/Light mode toggle
+    function toggleMode() {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+    }
+    // Restore mode & typing effect & progress bar
+    document.addEventListener('DOMContentLoaded', () => {
+      if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
+      const status = document.getElementById('statusMessage');
+      const text = status.getAttribute('data-text');
+      status.textContent = '';
+      let idx = 0;
+      const interval = setInterval(() => {
+        if (idx < text.length) status.textContent += text.charAt(idx++);
+        else clearInterval(interval);
+      }, 50);
+      const form = document.getElementById('searchForm');
+      form.addEventListener('submit', () => {
+        document.getElementById('loadingOverlay').style.display = 'flex';
+        document.getElementById('topProgress').style.width = '30%';
+        setTimeout(() => document.getElementById('topProgress').style.width = '60%', 300);
+        setTimeout(() => document.getElementById('topProgress').style.width = '100%', 600);
+      });
+    });
+  </script>
