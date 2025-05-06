@@ -21,16 +21,24 @@ def guardar_html(texto, nombre_base):
     return path
 
 # Función genérica de scraping con requests + BeautifulSoup
-# Ahora con headers para evitar bloqueos (403) y manejo de errores HTTP
+# Uso de Session y headers completos para reducir rechazos 403
+
 def scrape_site(url, container_sel, name_sel, price_sel, link_sel=None, tienda_name=""):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                       'AppleWebKit/537.36 (KHTML, like Gecko) '
-                      'Chrome/114.0.0.0 Safari/537.36'
+                      'Chrome/114.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+        'Referer': url.split('?')[0],
+        'Connection': 'keep-alive',
     }
+    session = requests.Session()
+    session.headers.update(headers)
+
     print(f"[{tienda_name}] Solicitando URL: {url}")
     try:
-        resp = requests.get(url, headers=headers, timeout=15)
+        resp = session.get(url, timeout=20)
         resp.raise_for_status()
     except requests.exceptions.HTTPError as e:
         print(f"[{tienda_name}] HTTPError: {e}")
