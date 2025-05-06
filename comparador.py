@@ -3,6 +3,7 @@ import requests
 from datetime import datetime
 from bs4 import BeautifulSoup
 import urllib.parse
+from requests_html import HTMLSession
 
 # Crear carpeta de capturas si no existe (solo HTML)
 def ensure_capturas():
@@ -20,8 +21,7 @@ def guardar_html(texto, nombre_base):
     print(f"📄 HTML guardado: {path}")
     return path
 
-# Función genérica de scraping con requests + BeautifulSoup
-# Uso de Session y headers completos para reducir rechazos 403
+# Función genérica de scraping con requests + BeautifulSoup y fallback a render JS
 
 def scrape_site(url, container_sel, name_sel, price_sel, link_sel=None, tienda_name=""):
     headers = {
@@ -40,18 +40,33 @@ def scrape_site(url, container_sel, name_sel, price_sel, link_sel=None, tienda_n
     try:
         resp = session.get(url, timeout=20)
         resp.raise_for_status()
-    except requests.exceptions.HTTPError as e:
-        print(f"[{tienda_name}] HTTPError: {e}")
-        return []
-    except requests.exceptions.RequestException as e:
-        print(f"[{tienda_name}] RequestException: {e}")
-        return []
+        html = resp.text
+    except Exception as e:
+        print(f"[{tienda_name}] Error en request inicial: {e}")
+        html = None
 
-    html = resp.text
-    guardar_html(html, f"{tienda_name.lower()}_raw")
-    soup = BeautifulSoup(html, 'html.parser')
-    items = soup.select(container_sel)
-    print(f"[{tienda_name}] Encontrados {len(items)} contenedores")
+    if html:
+        guardar_html(html, f"{tienda_name.lower()}_raw")
+        soup = BeautifulSoup(html, 'html.parser')
+        items = soup.select(container_sel)
+    else:
+        items = []
+
+    # Si no hay items con requests, intentar renderizar JS
+    if not items:
+        print(f"[{tienda_name}] Sin resultados estáticos, renderizando JS...")
+        js_session = HTMLSession()
+        try:
+            r_js = js_session.get(url)
+            r_js.html.render(timeout=20)
+            html_js = r_js.html.html
+            guardar_html(html_js, f"{tienda_name.lower()}_js")
+            soup = BeautifulSoup(html_js, 'html.parser')
+            items = soup.select(container_sel)
+            print(f"[{tienda_name}] Encontrados {len(items)} contenedores tras render JS")
+        except Exception as e:
+            print(f"[{tienda_name}] Error render JS: {e}")
+            items = []
 
     productos = []
     for item in items[:5]:
