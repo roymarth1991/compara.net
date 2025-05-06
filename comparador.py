@@ -21,15 +21,30 @@ def guardar_html(texto, nombre_base):
     return path
 
 # Función genérica de scraping con requests + BeautifulSoup
+# Ahora con headers para evitar bloqueos (403) y manejo de errores HTTP
 def scrape_site(url, container_sel, name_sel, price_sel, link_sel=None, tienda_name=""):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                      'AppleWebKit/537.36 (KHTML, like Gecko) '
+                      'Chrome/114.0.0.0 Safari/537.36'
+    }
     print(f"[{tienda_name}] Solicitando URL: {url}")
-    resp = requests.get(url, timeout=15)
-    resp.raise_for_status()
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        resp.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        print(f"[{tienda_name}] HTTPError: {e}")
+        return []
+    except requests.exceptions.RequestException as e:
+        print(f"[{tienda_name}] RequestException: {e}")
+        return []
+
     html = resp.text
     guardar_html(html, f"{tienda_name.lower()}_raw")
     soup = BeautifulSoup(html, 'html.parser')
     items = soup.select(container_sel)
     print(f"[{tienda_name}] Encontrados {len(items)} contenedores")
+
     productos = []
     for item in items[:5]:
         try:
