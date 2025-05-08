@@ -3,7 +3,11 @@ from flask import Flask, render_template, request, flash
 from comparador import buscar_en_todas  # tu módulo scraper
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "CAMBIA_ESTA_CLAVE_POR_ALGO_SECRETO")  # recomendable usar var de entorno
+app.secret_key = os.environ.get("SECRET_KEY", "CAMBIA_ESTA_CLAVE_POR_ALGO_SECRETO")
+
+@app.route("/health")
+def health():
+    return "OK", 200
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -25,5 +29,9 @@ def index():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    # En producción debug=False
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False,
+        use_reloader=False
+    )
