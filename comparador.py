@@ -1,164 +1,195 @@
 import os
-import requests
-from datetime import datetime
-from bs4 import BeautifulSoup
+import json
+import time
 import urllib.parse
-from requests_html import HTMLSession
+import cloudscraper
+import requests
+from bs4 import BeautifulSoup
+import asyncio
+from playwright.async_api import async_playwright
 
-# Crear carpeta de capturas si no existe (solo HTML)
+CACHE_FILE = "cache.json"
+CACHE_TTL = 60 * 60 * 3  # 3 horas
+
 def ensure_capturas():
     if not os.path.exists("capturas"):
         os.makedirs("capturas")
 
 ensure_capturas()
 
-# Guardar HTML para debugging
 def guardar_html(texto, nombre_base):
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = time.strftime("%Y%m%d_%H%M%S")
     path = f"capturas/{nombre_base}_{ts}.html"
-    with open(path, 'w', encoding='utf-8') as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write(texto)
-    print(f"📄 HTML guardado: {path}")
+    print(f"📄 HTML guardado en: {path}")
     return path
 
-# Función genérica de scraping con requests + BeautifulSoup y fallback a render JS
+def cargar_cache():
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
 
-def scrape_site(url, container_sel, name_sel, price_sel, link_sel=None, tienda_name=""):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                      'AppleWebKit/537.36 (KHTML, like Gecko) '
-                      'Chrome/114.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-        'Referer': url.split('?')[0],
-        'Connection': 'keep-alive',
-    }
-    session = requests.Session()
-    session.headers.update(headers)
+def guardar_cache(cache):
+    with open(CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=False, indent=2)
 
-    print(f"[{tienda_name}] Solicitando URL: {url}")
-    try:
-        resp = session.get(url, timeout=20)
-        resp.raise_for_status()
-        html = resp.text
-    except Exception as e:
-        print(f"[{tienda_name}] Error en request inicial: {e}")
-        html = None
+CACHE = cargar_cache()
 
-    if html:
-        guardar_html(html, f"{tienda_name.lower()}_raw")
-        soup = BeautifulSoup(html, 'html.parser')
-        items = soup.select(container_sel)
-    else:
-        items = []
+def cache_valido(entry):
+    return (
+        isinstance(entry, dict)
+        and "timestamp" in entry
+        and "data" in entry
+        and isinstance(entry["data"], list)
+        and entry["data"]
+        and (time.time() - entry["timestamp"]) < CACHE_TTL
+    )
 
-    # Si no hay items con requests, intentar renderizar JS
-    if not items:
-        print(f"[{tienda_name}] Sin resultados estáticos, renderizando JS...")
-        js_session = HTMLSession()
+# Fetch dinámico con Playwright
+async def fetch_js_content(url, wait_selector, tienda_name):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto(url)
         try:
-            r_js = js_session.get(url)
-            r_js.html.render(timeout=20)
-            html_js = r_js.html.html
-            guardar_html(html_js, f"{tienda_name.lower()}_js")
-            soup = BeautifulSoup(html_js, 'html.parser')
-            items = soup.select(container_sel)
-            print(f"[{tienda_name}] Encontrados {len(items)} contenedores tras render JS")
+            await page.wait_for_selector(wait_selector, timeout=30000)
+            await page.wait_for_timeout(2000)
+        except Exception:
+            print(f"[{tienda_name}] Timeout JS selector: {wait_selector}")
+        content = await page.content()
+        await browser.close()
+        return content
+
+# Wrapper síncrono
+def get_js_html(url, wait_selector, tienda_name):
+    return asyncio.run(fetch_js_content(url, wait_selector, tienda_name))
+
+def scrape_site(url, cont_sel, name_sel, price_sel, link_sel=None, tienda_name="", js_render=False):
+    cache_key = f"{tienda_name}|{url}"
+    if cache_key in CACHE and cache_valido(CACHE[cache_key]):
+        print(f"[{tienda_name}] Cache válido")
+        return CACHE[cache_key]["data"]
+
+    print(f"[{tienda_name}] Solicitando: {url}")
+    html = None
+    if js_render:
+        html = get_js_html(url, cont_sel, tienda_name)
+    else:
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://jumbo.com.do/'}
+            if "jumbo.com.do" in url:
+                scraper = cloudscraper.create_scraper()
+                scraper.get("https://jumbo.com.do", headers=headers, timeout=10)
+                resp = scraper.get(url, headers=headers, timeout=15)
+            else:
+                time.sleep(2)
+                resp = requests.get(url, headers=headers, timeout=20)
+            resp.raise_for_status()
+            html = resp.text
         except Exception as e:
-            print(f"[{tienda_name}] Error render JS: {e}")
-            items = []
+            print(f"[{tienda_name}] HTTP Error: {e}")
+            return []
+
+    guardar_html(html, tienda_name.lower())
+    soup = BeautifulSoup(html, "html.parser")
+    items = soup.select(cont_sel)
+    print(f"[{tienda_name}] Elementos encontrados: {len(items)}")
 
     productos = []
-    for item in items[:5]:
+    for item in items[:10]:
         try:
-            nombre_tag = item.select_one(name_sel)
-            precio_tag = item.select_one(price_sel)
+            nombre_el = item.select_one(name_sel)
+            precio_el = item.select_one(price_sel)
+            if not nombre_el or not precio_el:
+                continue
+            nombre = nombre_el.get_text(strip=True)
+            precio = precio_el.get_text(strip=True)
             enlace = None
             if link_sel:
-                link_tag = item.select_one(link_sel)
-                enlace = urllib.parse.urljoin(url, link_tag['href']) if link_tag else None
-            nombre = nombre_tag.get_text(strip=True) if nombre_tag else ''
-            precio = precio_tag.get_text(strip=True) if precio_tag else ''
-            productos.append({
-                "nombre": nombre,
-                "precio": precio,
-                "tienda": tienda_name,
-                "enlace": enlace
-            })
+                link_el = item.select_one(link_sel)
+                if link_el and link_el.has_attr("href"):
+                    enlace = urllib.parse.urljoin(url, link_el["href"])
+            productos.append({"nombre": nombre, "precio": precio, "tienda": tienda_name, "enlace": enlace})
         except Exception as e:
-            print(f"[{tienda_name}] Error extrayendo item: {e}")
+            print(f"[{tienda_name}] Error extraer: {e}")
+
+    CACHE[cache_key] = {"timestamp": time.time(), "data": productos}
+    guardar_cache(CACHE)
     return productos
 
 # Funciones específicas por tienda
-
 def buscar_jumbo(termino):
-    url = f"https://jumbo.com.do/catalogsearch/result/?q={urllib.parse.quote(termino)}"
     return scrape_site(
-        url,
-        container_sel="div.product-item-info",
+        f"https://jumbo.com.do/catalogsearch/result/?q={urllib.parse.quote(termino)}",
+        cont_sel="div.product-item-info",
         name_sel=".product-item-tile__name a",
         price_sel=".product-item-tile__price-current",
         link_sel="a.product-item-tile__link",
-        tienda_name="Jumbo"
+        tienda_name="Jumbo",
+        js_render=False
     )
 
 def buscar_sirena(termino):
-    url = f"https://www.sirena.do/products/search/{urllib.parse.quote(termino)}"
     return scrape_site(
-        url,
-        container_sel="div.item-product",
+        f"https://www.sirena.do/products/search/{urllib.parse.quote(termino)}",
+        cont_sel="div.item-product",
         name_sel=".item-product-title a",
         price_sel=".item-product-price strong",
-        tienda_name="La Sirena"
+        link_sel=None,
+        tienda_name="La Sirena",
+        js_render=True
     )
 
 def buscar_nacional(termino):
-    url = f"https://supermercadosnacional.com/catalogsearch/result/?q={urllib.parse.quote(termino)}"
     return scrape_site(
-        url,
-        container_sel="div.product-item-info",
+        f"https://supermercadosnacional.com/catalogsearch/result/?q={urllib.parse.quote(termino)}",
+        cont_sel="div.product-item-info",
         name_sel="a.product-item-link",
         price_sel="[data-price-type='finalPrice'] span.price",
         link_sel="a.product-item-link",
-        tienda_name="Nacional"
+        tienda_name="Nacional",
+        js_render=False
     )
 
 def buscar_plaza_lama(termino):
-    url = f"https://plazalama.com.do/search?name={urllib.parse.quote(termino)}"
     return scrape_site(
-        url,
-        container_sel="div.card-product-vertical.product-card-default",
+        f"https://plazalama.com.do/search?name={urllib.parse.quote(termino)}",
+        cont_sel="div.card-product-vertical.product-card-default",
         name_sel=".prod__name",
         price_sel=".base__price",
-        tienda_name="Plaza Lama"
+        link_sel=None,
+        tienda_name="Plaza Lama",
+        js_render=True
     )
 
 def buscar_pricesmart(termino):
-    url = f"https://www.pricesmart.com/es-do/busqueda?q={urllib.parse.quote(termino)}"
     return scrape_site(
-        url,
-        container_sel="div.product-card-vertical",
+        f"https://www.pricesmart.com/es-do/busqueda?q={urllib.parse.quote(termino)}",
+        cont_sel="div.product-card-vertical",
         name_sel="span.product-card__title",
         price_sel="span.sf-price__regular",
-        tienda_name="PriceSmart"
+        link_sel=None,
+        tienda_name="PriceSmart",
+        js_render=True
     )
 
-# Función que agrupa todas las búsquedas
 def buscar_en_todas(termino):
-    fuentes = [
-        buscar_jumbo,
-        buscar_sirena,
-        buscar_nacional,
-        buscar_plaza_lama,
-        buscar_pricesmart
-    ]
+    fuentes = [buscar_jumbo, buscar_sirena, buscar_nacional, buscar_plaza_lama, buscar_pricesmart]
     resultados = []
     for fuente in fuentes:
-        resultados.extend(fuente(termino))
-    # Ordenar por precio numérico
-    def parse_precio(p):
-        try:
-            return float(p['precio'].replace('RD$', '').replace('$', '').replace(',', '').strip())
-        except:
-            return float('inf')
-    return sorted(resultados, key=parse_precio)
+        resultados += fuente(termino)
+    resultados.sort(key=lambda p: float(p['precio']
+                      .replace('RD$', '')
+                      .replace('DOP', '')
+                      .replace('$', '')
+                      .replace(',', '')
+                      .strip()) if p['precio'] else float('inf'))
+    return resultados
+
+# Prueba manual
+if __name__ == '__main__':
+    termino = input('Término a buscar: ')
+    for prod in buscar_en_todas(termino):
+        print(prod)
