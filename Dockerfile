@@ -23,8 +23,8 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 # 6) Instala navegadores de Playwright
-#    Usamos la CLI de Python para instalar solo los binarios
 RUN python -m playwright install
+
 
 # 7) Copia el resto de tu aplicación
 COPY . .
