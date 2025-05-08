@@ -28,9 +28,9 @@ RUN python -m playwright install
 # 7) Copia el resto de tu aplicación
 COPY . .
 
-# 8) Expone el puerto de la app
+# 8) (Opcional) Expone un puerto estático para documentación
 EXPOSE 8000
 
-# 9) Arranque con Gunicorn en modo producción
-# Asegúrate de haber añadido 'gunicorn' en tu requirements.txt
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8000", "--workers", "4"]
+# 9) Arranque con Gunicorn en modo producción usando el puerto dinámico de Railway
+#    Se usa sh -c para que expanda la variable $PORT
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:$PORT --workers 4"]
