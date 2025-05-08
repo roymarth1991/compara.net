@@ -1,7 +1,7 @@
-# Usa la imagen oficial ligera de Python
+# 1) Imagen base ligera de Python
 FROM python:3.10-slim
 
-# 1) Instala herramientas de compilación y dependencias de sistema
+# 2) Instala herramientas y librerías de sistema para compilar extensiones y soportar navegadores headless
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       build-essential python3-dev libffi-dev curl \
@@ -10,26 +10,27 @@ RUN apt-get update && \
       libpango-1.0-0 libxss1 libasound2 libxtst6 libgtk-3-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# 2) Crea y activa un virtualenv
+# 3) Crea y activa virtualenv
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# 3) Actualiza pip, setuptools y wheel
+# 4) Upgrade pip/setuptools/wheel
 RUN pip install --upgrade pip setuptools wheel
 
-# 4) Copia y instala las dependencias Python
+# 5) Copia e instala dependencias de Python
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# 5) Instala navegadores y dependencias de Playwright
-RUN playwright install --with-deps
+# 6) Instala navegadores de Playwright
+#    Usamos la CLI de Python para instalar solo los binarios
+RUN python -m playwright install
 
-# 6) Copia el resto de tu aplicación
+# 7) Copia el resto de tu aplicación
 COPY . .
 
-# 7) Expone el puerto en el que corre tu app
+# 8) Expone el puerto de la app
 EXPOSE 8000
 
-# 8) Comando de arranque
+# 9) Comando de arranque
 CMD ["python", "app.py"]
