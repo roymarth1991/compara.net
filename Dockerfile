@@ -25,12 +25,12 @@ RUN pip install -r requirements.txt
 # 6) Instala navegadores de Playwright
 RUN python -m playwright install
 
-
 # 7) Copia el resto de tu aplicación
 COPY . .
 
 # 8) Expone el puerto de la app
 EXPOSE 8000
 
-# 9) Comando de arranque
-CMD ["python", "app.py"]
+# 9) Arranque con Gunicorn en modo producción
+# Asegúrate de haber añadido 'gunicorn' en tu requirements.txt
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8000", "--workers", "4"]
