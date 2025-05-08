@@ -1,5 +1,6 @@
-requests==2.31.0
-beautifulsoup4==4.12.2
-cloudscraper==1.2.71
-nest_asyncio==1.6.0
-pyppeteer==1.0.2
+flask
+requests
+beautifulsoup4
+cloudscraper
+pyppeteer
+nest_asyncio
