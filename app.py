@@ -1,12 +1,10 @@
+import os
 from flask import Flask, render_template, request, redirect, url_for
 from comparador import buscar_en_todas, obtener_top5  # Importar también obtener_top5
 from db import init_db, guardar_en_db
 
 app = Flask(__name__)
-
-# Solo inicializar la base de datos una vez
-if not os.path.exists('productos_db.db'):
-    init_db()  # Inicia la base de datos al arrancar, solo si es necesario
+init_db()  # inicia la base de datos al arrancar
 
 TIENDAS = ["Jumbo", "La Sirena", "Nacional", "Plaza Lama", "PriceSmart"]
 
@@ -14,14 +12,15 @@ TIENDAS = ["Jumbo", "La Sirena", "Nacional", "Plaza Lama", "PriceSmart"]
 def index():
     resultados = []
     termino = ""
-    top5 = obtener_top5()  # Obtener top 5 búsquedas siempre, fuera del POST
+    # Obtener top 5 búsquedas siempre
+    top5 = obtener_top5()
 
     if request.method == "POST" and "termino" in request.form:
         termino = request.form["termino"]
-        if termino.strip():  # Verifica si se ingresa un término válido
-            resultados = buscar_en_todas(termino)
-            guardar_en_db(resultados)
-            top5 = obtener_top5()  # Actualizar top5 después de guardar
+        resultados = buscar_en_todas(termino)
+        guardar_en_db(resultados)
+        # Actualizar top5 luego de registrar búsqueda
+        top5 = obtener_top5()
 
     return render_template(
         "index.html",
@@ -34,8 +33,6 @@ def index():
 @app.route("/lista", methods=["POST"])
 def lista():
     productos = request.form.getlist("producto")
-    if not productos:
-        return render_template("index.html", error="No se seleccionaron productos")  # Validación de formulario vacío
     totales = {t: 0.0 for t in TIENDAS}
     detalle = {t: [] for t in TIENDAS}
 
