@@ -3,16 +3,17 @@ import psycopg2
 import os
 
 # Variables de conexión
-DB_HOST = os.getenv('DB_HOST', 'localhost')
-DB_PORT = os.getenv('DB_PORT', 5432)
+DB_HOST = os.getenv('DB_HOST', 'localhost')  # El host de Railway será un proxy, o 'localhost' si lo usas localmente
+DB_PORT = os.getenv('DB_PORT', '5432')      # Puerto de conexión, el de Railway es '45740' o '5432' si es local
 DB_NAME = os.getenv('DB_NAME', 'productos_db')
 DB_USER = os.getenv('DB_USER', 'usuario')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'contraseña')
 
 def get_db_connection():
+    # Crear conexión a la base de datos
     conn = psycopg2.connect(
         host=DB_HOST,
-        port=DB_PORT,
+        port=DB_PORT,  # Usar el puerto de Railway o '5432' para conexión local
         database=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD
@@ -23,7 +24,8 @@ def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    cur.execute('''
+    # Crear las tablas si no existen
+    cur.execute('''  
     CREATE TABLE IF NOT EXISTS productos (
         id SERIAL PRIMARY KEY,
         nombre TEXT NOT NULL,
@@ -52,21 +54,18 @@ def guardar_en_db(productos):
 
     for p in productos:
         try:
-            # Insertar producto (ignora si ya existe)
+            # Insertar producto, ignorando duplicados por nombre y tienda
             cur.execute('''
                 INSERT INTO productos (nombre, tienda, enlace) 
                 VALUES (%s, %s, %s) 
                 ON CONFLICT (nombre, tienda) DO NOTHING
             ''', (p["nombre"], p["tienda"], p["enlace"]))
 
-            # Obtener ID del producto
+            # Obtener ID del producto recién insertado
             cur.execute('''
                 SELECT id FROM productos WHERE nombre = %s AND tienda = %s
             ''', (p["nombre"], p["tienda"]))
-            resultado = cur.fetchone()
-            if resultado is None:
-                continue
-            producto_id = resultado[0]
+            producto_id = cur.fetchone()[0]
 
             # Insertar precio
             precio = float(
