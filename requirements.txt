@@ -6,3 +6,4 @@ beautifulsoup4==4.12.2
 cloudscraper==1.2.62
 playwright==1.24.0
 gunicorn==20.1.0
+python-dotenv==1.0.0  # Añadido para resolver el error
