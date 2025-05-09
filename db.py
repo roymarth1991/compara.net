@@ -1,26 +1,24 @@
 # db.py
 import psycopg2
 import os
-from psycopg2 import sql
 
-# Configuración de la base de datos
-DB_HOST = os.getenv("DB_HOST", "localhost")  # Usualmente, en producción en Railway será una variable de entorno
-DB_NAME = os.getenv("DB_NAME", "productos_db")
-DB_USER = os.getenv("DB_USER", "usuario")  # Tu usuario de PostgreSQL
-DB_PASSWORD = os.getenv("DB_PASSWORD", "contraseña")  # Tu contraseña de PostgreSQL
+# Variables de conexión
+DB_HOST = os.getenv('DB_HOST', 'localhost')  # El host puede ser local o un servicio de base de datos en la nube como Railway
+DB_NAME = os.getenv('DB_NAME', 'productos_db')
+DB_USER = os.getenv('DB_USER', 'usuario')
+DB_PASSWORD = os.getenv('DB_PASSWORD', 'contraseña')
 
-def get_connection():
-    """Conectar a la base de datos PostgreSQL"""
+def get_db_connection():
     conn = psycopg2.connect(
         host=DB_HOST,
-        dbname=DB_NAME,
+        database=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD
     )
     return conn
 
 def init_db():
-    conn = get_connection()
+    conn = get_db_connection()
     cur = conn.cursor()
 
     cur.execute('''
@@ -47,30 +45,32 @@ def init_db():
     conn.close()
 
 def guardar_en_db(productos):
-    conn = get_connection()
+    conn = get_db_connection()
     cur = conn.cursor()
 
     for p in productos:
         try:
-            # Insertar un nuevo producto (ignorar duplicados)
+            # Insertar producto, ignorando duplicados por nombre y tienda
             cur.execute('''
-            INSERT INTO productos (nombre, tienda, enlace) 
-            VALUES (%s, %s, %s) 
-            ON CONFLICT (nombre, tienda) DO NOTHING
+                INSERT INTO productos (nombre, tienda, enlace) 
+                VALUES (%s, %s, %s) 
+                ON CONFLICT (nombre, tienda) DO NOTHING
             ''', (p["nombre"], p["tienda"], p["enlace"]))
 
-            # Obtener el ID del producto insertado
+            # Obtener ID del producto recién insertado
             cur.execute('''
-            SELECT id FROM productos WHERE nombre = %s AND tienda = %s
+                SELECT id FROM productos WHERE nombre = %s AND tienda = %s
             ''', (p["nombre"], p["tienda"]))
             producto_id = cur.fetchone()[0]
 
-            # Convertir precio a tipo float
-            precio = float(p['precio'].replace('RD$', '').replace('DOP', '').replace('$', '').replace(',', '').strip())
+            # Insertar precio
+            precio = float(
+                p['precio'].replace('RD$', '').replace('DOP', '').replace('$', '').replace(',', '').strip()
+            )
 
-            # Insertar el precio del producto
             cur.execute('''
-            INSERT INTO precios (producto_id, precio) VALUES (%s, %s)
+                INSERT INTO precios (producto_id, precio) 
+                VALUES (%s, %s)
             ''', (producto_id, precio))
 
         except Exception as e:
