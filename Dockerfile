@@ -1,15 +1,14 @@
 # 1) Imagen base ligera de Python
 FROM python:3.10-slim
 
-# 2) Instala herramientas y librerías de sistema necesarias para compilar extensiones y soportar navegadores headless, además de dependencias para PostgreSQL
+# 2) Instala herramientas y librerías de sistema para compilar extensiones y soportar navegadores headless
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       build-essential python3-dev libffi-dev curl \
       libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
       libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
-      libpango-1.0-0 libxss1 libasound2 libxtst6 libgtk-3-0 \
-      libpq-dev  # Necesario para PostgreSQL
-    && rm -rf /var/lib/apt/lists/*
+      libpango-1.0-0 libxss1 libasound2 libxtst6 libgtk-3-0 && \
+    rm -rf /var/lib/apt/lists/*
 
 # 3) Crea y activa virtualenv
 RUN python -m venv /opt/venv
