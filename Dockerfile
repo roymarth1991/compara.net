@@ -20,7 +20,7 @@ RUN pip install --upgrade pip setuptools wheel
 # 5) Copia e instala dependencias de Python
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt  # Usamos --no-cache-dir para evitar problemas de cache
 
 # 6) Instala navegadores de Playwright
 RUN python -m playwright install
@@ -32,5 +32,4 @@ COPY . .
 EXPOSE 8000
 
 # 9) Arranque con Gunicorn en modo producción usando el puerto dinámico de Railway
-#    Se usa sh -c para que expanda la variable $PORT
 CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:$PORT --workers 4"]
