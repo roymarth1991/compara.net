@@ -3,7 +3,8 @@ import psycopg2
 import os
 
 # Variables de conexión
-DB_HOST = os.getenv('DB_HOST', 'localhost')  # El host puede ser local o un servicio de base de datos en la nube como Railway
+DB_HOST = os.getenv('DB_HOST', 'localhost')
+DB_PORT = os.getenv('DB_PORT', 5432)
 DB_NAME = os.getenv('DB_NAME', 'productos_db')
 DB_USER = os.getenv('DB_USER', 'usuario')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'contraseña')
@@ -11,6 +12,7 @@ DB_PASSWORD = os.getenv('DB_PASSWORD', 'contraseña')
 def get_db_connection():
     conn = psycopg2.connect(
         host=DB_HOST,
+        port=DB_PORT,
         database=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD
@@ -50,18 +52,21 @@ def guardar_en_db(productos):
 
     for p in productos:
         try:
-            # Insertar producto, ignorando duplicados por nombre y tienda
+            # Insertar producto (ignora si ya existe)
             cur.execute('''
                 INSERT INTO productos (nombre, tienda, enlace) 
                 VALUES (%s, %s, %s) 
                 ON CONFLICT (nombre, tienda) DO NOTHING
             ''', (p["nombre"], p["tienda"], p["enlace"]))
 
-            # Obtener ID del producto recién insertado
+            # Obtener ID del producto
             cur.execute('''
                 SELECT id FROM productos WHERE nombre = %s AND tienda = %s
             ''', (p["nombre"], p["tienda"]))
-            producto_id = cur.fetchone()[0]
+            resultado = cur.fetchone()
+            if resultado is None:
+                continue
+            producto_id = resultado[0]
 
             # Insertar precio
             precio = float(
