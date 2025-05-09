@@ -1,15 +1,16 @@
 import psycopg2
 import os
 
-# Variables de conexión
-DB_HOST = os.getenv('DB_HOST', 'localhost')
-DB_PORT = os.getenv('DB_PORT', '5432')  # Puede ser 45740 en Railway, o 5432 en local
+# Variables de conexión para Railway (si las tienes configuradas en Railway)
+DB_HOST = os.getenv('DB_HOST', 'localhost')  # El valor por defecto es 'localhost' si no se encuentra en las variables de entorno
+DB_PORT = os.getenv('DB_PORT', '5432')      # El puerto de Railway podría ser 45740 o 5432 si es local
 DB_NAME = os.getenv('DB_NAME', 'productos_db')
 DB_USER = os.getenv('DB_USER', 'usuario')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'contraseña')
 
 def get_db_connection():
     try:
+        print(f"Conectando a la base de datos en {DB_HOST}:{DB_PORT}...")
         # Crear conexión a la base de datos
         conn = psycopg2.connect(
             host=DB_HOST,
