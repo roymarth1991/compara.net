@@ -5,7 +5,7 @@ FROM python:3.10-slim
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       build-essential python3-dev libffi-dev curl \
-      libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+      libpq-dev libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
       libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
       libpango-1.0-0 libxss1 libasound2 libxtst6 libgtk-3-0 && \
     rm -rf /var/lib/apt/lists/*
@@ -20,7 +20,7 @@ RUN pip install --upgrade pip setuptools wheel
 # 5) Copia e instala dependencias de Python
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt  # Usamos --no-cache-dir para evitar problemas de cache
+RUN pip install --no-cache-dir -v -r requirements.txt  # Usamos --no-cache-dir para evitar problemas de cache
 
 # 6) Instala navegadores de Playwright
 RUN python -m playwright install
