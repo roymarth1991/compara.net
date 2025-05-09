@@ -1,4 +1,3 @@
-import os
 from flask import Flask, render_template, request, redirect, url_for
 from comparador import buscar_en_todas, obtener_top5  # Importar también obtener_top5
 from db import init_db, guardar_en_db
@@ -65,6 +64,11 @@ def lista():
         mejor=mejor,
         top5=top5
     )
+
+# Ruta de verificación de salud
+@app.route("/health")
+def health_check():
+    return "OK", 200
 
 if __name__ == "__main__":
     app.run(debug=True)
