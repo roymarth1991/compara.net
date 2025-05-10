@@ -3,6 +3,7 @@
 import os
 import json
 import time
+import re
 import urllib.parse
 import cloudscraper
 import requests
@@ -187,8 +188,6 @@ def buscar_jumbo(termino: str) -> list:
         js_render=False
     )
 
-# TODO: definir buscar_sirena, buscar_nacional, buscar_plaza_lama, buscar_pricesmart con mismos parámetros
-
 def buscar_sirena(termino: str) -> list:
     return scrape_site(
         f"https://www.sirena.do/products/search/{urllib.parse.quote(termino)}",
@@ -230,6 +229,16 @@ def buscar_pricesmart(termino: str) -> list:
         js_render=True
     )
 
+# Función de limpieza de precios
+
+def precio_a_float(precio: str) -> float:
+    try:
+        precio_limpio = re.sub(r'[^\d.,]', '', precio)
+        precio_limpio = precio_limpio.replace(',', '')
+        return float(precio_limpio)
+    except:
+        return float('inf')
+
 # --- Búsqueda en todas las tiendas ---
 
 def buscar_en_todas(termino: str) -> list:
@@ -239,14 +248,7 @@ def buscar_en_todas(termino: str) -> list:
     resultados = []
     for fuente in fuentes:
         resultados += fuente(termino)
-    resultados.sort(key=lambda p: float(
-        p['precio']
-        .replace('RD$', '')
-        .replace('DOP', '')
-        .replace('$', '')
-        .replace(',', '')
-        .strip()
-    ) if p['precio'] else float('inf'))
+    resultados.sort(key=lambda p: precio_a_float(p['precio']) if p['precio'] else float('inf'))
     guardar_en_db(resultados)
     return resultados
 
