@@ -1,4 +1,4 @@
-# scraper.py
+# comparador.py
 
 import os
 import json
@@ -15,7 +15,7 @@ from db import init_db, guardar_en_db  # Inicializa y guarda en BD
 # Archivos de configuración
 top_file = "top_searches.json"
 CACHE_FILE = "cache.json"
-CACHE_TTL = 60 * 60 * 3  # 3 horas
+CACHE_TTL = None  # Cache sin expiración
 
 # Directorio de capturas
 def ensure_capturas():
@@ -72,14 +72,16 @@ def guardar_cache(cache: dict):
 CACHE = cargar_cache()
 
 def cache_valido(entry: dict) -> bool:
-    return (
-        isinstance(entry, dict)
-        and 'timestamp' in entry
-        and 'data' in entry
-        and isinstance(entry['data'], list)
-        and entry['data']
-        and (time.time() - entry['timestamp']) < CACHE_TTL
-    )
+    # Validación básica
+    if not isinstance(entry, dict) or 'timestamp' not in entry or 'data' not in entry:
+        return False
+    if not isinstance(entry['data'], list) or not entry['data']:
+        return False
+    # Si CACHE_TTL es None, nunca expira
+    if CACHE_TTL is None:
+        return True
+    # Si tiene TTL, comprueba tiempo
+    return (time.time() - entry['timestamp']) < CACHE_TTL
 
 # --- Scraping con Playwright para JS ---
 
